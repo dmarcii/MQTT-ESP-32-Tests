@@ -4,13 +4,27 @@ extern "C" {
   #include "freertos/timers.h"
 }
 #include <AsyncMqttClient.h>
-
-
+#include <painlessMesh.h>
+#include <WiFiClient.h>
 
 #define WIFI_SSID "marci"
 #define WIFI_PASSWORD "marcimarci"
-#define MQTT_HOST IPAddress(192, 168, 0, 104)
+#define MQTT_HOST IPAddress(192, 168, 0, 110)
 #define MQTT_PORT 1883
+
+
+#define   MESH_PREFIX     "ESP32 Mesh"
+#define   MESH_PASSWORD   "1234567890"
+#define   MESH_PORT       5555
+#define HOSTNAME "MQTT_Mesh"
+
+painlessMesh  mesh;
+WiFiClient wifiClient;
+
+void receivedCallback( const uint32_t &from, const String &msg ) {
+  Serial.printf("bridge: Received from %u msg=%s\n", from, msg.c_str());
+  String topic = "painlessMesh/from/" + String(from);
+}
 
 // Create objects to handle MQTT client
 AsyncMqttClient mqttClient;
@@ -49,9 +63,6 @@ void WiFiEvent(WiFiEvent_t event) {
   }
 }
 
-
-
-
 // Add more topics that want your ESP32 to be subscribed to
 void onMqttConnect(bool sessionPresent) {
   Serial.println("Connected to MQTT.");
@@ -59,8 +70,6 @@ void onMqttConnect(bool sessionPresent) {
   Serial.println(sessionPresent);
   // ESP32 subscribed to topic
   uint16_t packetIdSub = mqttClient.subscribe("topic/OnOff", 0);
-  Serial.print("Subscribing at QoS 0, packetId: ");
-  Serial.println(packetIdSub);
 }
 
 void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
@@ -69,9 +78,6 @@ void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
     xTimerStart(mqttReconnectTimer, 0);
   }
 }
-
-
-
 
 void onMqttSubscribe(uint16_t packetId, uint8_t qos) {
   Serial.println("Subscribe acknowledged.");
@@ -93,7 +99,6 @@ void onMqttPublish(uint16_t packetId) {
   Serial.println(packetId);
 }
 
-
 void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total) {
   String messageTemp;
   Serial.println(messageTemp);
@@ -107,46 +112,41 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
 
     if (messageTemp == "on") {
       digitalWrite(pin, HIGH);
-      mqttClient.publish("topic/OnOff", 2, true, "prendido");
 
     }
     else if (messageTemp == "off")
     {
       digitalWrite(pin, LOW);
-      mqttClient.publish("topic/OnOff", 2, true, "Apagado");
+      //mqttClient.publish("topic/OnOff", 2, true, "Apagado");
     }
-    
 
-
+    if (strcmp(topic, "topic/state") == 0) {
+    //mesh.isConnected();
+    Serial.println("Mensage Recibido");
   }
- 
-/*   Serial.println("Publish received.");
-  Serial.print("  message: ");
-  Serial.println(messageTemp);
-  Serial.print("  topic: ");
-  Serial.println(topic);
-  Serial.print("  qos: ");
-  Serial.println(properties.qos);
-  Serial.print("  dup: ");
-  Serial.println(properties.dup);
-  Serial.print("  retain: ");
-  Serial.println(properties.retain);
-  Serial.print("  len: ");
-  Serial.println(len);
-  Serial.print("  index: ");
-  Serial.println(index);
-  Serial.print("  total: ");
-  Serial.println(total); */
   Serial.print("  total: ");
 }
 
-
-
+}
 
 void setup() {
   
   Serial.begin(115200);
   pinMode(pin, OUTPUT);
+
+  /* Mesh Config */
+
+  mesh.setDebugMsgTypes( ERROR | STARTUP | CONNECTION );  
+  mesh.init( MESH_PREFIX, MESH_PASSWORD, MESH_PORT, WIFI_AP_STA, 6 );
+  mesh.onReceive(&receivedCallback);
+  mesh.stationManual(WIFI_SSID, WIFI_PASSWORD);
+  mesh.setHostname(HOSTNAME);
+  mesh.setRoot(true);
+  mesh.setContainsRoot(true);
+  //End mesh Setup Callbacks
+
+
+// MQTT
   mqttReconnectTimer = xTimerCreate("mqttTimer", pdMS_TO_TICKS(2000), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToMqtt));
   wifiReconnectTimer = xTimerCreate("wifiTimer", pdMS_TO_TICKS(2000), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToWifi));
 
@@ -161,9 +161,11 @@ void setup() {
   mqttClient.setServer(MQTT_HOST, MQTT_PORT);
 
   connectToWifi();
+
 }
 
 void loop() {
+    mesh.update();
     /* uint16_t packetIdPub2 = mqttClient.publish("topic/hello", 2, true, "siuuuuu");
     uint16_t packetIdPub3 = mqttClient.publish("topic/hello2", 2, true, "El bicho");
     Serial.print("Publishing on topic at QoS 2, packetId: ");
@@ -177,53 +179,3 @@ void loop() {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*#include <PubSubClient.h>
-
-
-IPAddress ip(192, 168, 0, 104);
-IPAddress ipclient(192, 168, 0, 108);
-const int port = 1883;
-PubSubClient client;
-
-void setup ()  {
-    Serial.begin(115200);
-    client.setServer(ip,1883);
-    Serial.println( client.connect("client1"));
-
-}
-
-
-void loop () {
-
-  client.publish("topic/hello", "Hello dude");
-  delay(5000);
-  client.loop();
-
-}
-
-
-
-*/
