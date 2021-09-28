@@ -69,7 +69,11 @@ void onMqttConnect(bool sessionPresent) {
   Serial.print("Session present: ");
   Serial.println(sessionPresent);
   // ESP32 subscribed to topic
-  uint16_t packetIdSub = mqttClient.subscribe("topic/OnOff", 0);
+  uint16_t packetIdSub = mqttClient.subscribe("topic/section_1", 0);
+  uint16_t packetIdSub5 = mqttClient.subscribe("topic/OnOff", 0);
+  mqttClient.publish("topic/section_1", 2, true, "Active");
+  //El topico debe ser por zonas
+  mqttClient.publish("topic/ConnectedNodes", 2, true, "Zona 1 Nodo 1");
 }
 
 void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
@@ -119,14 +123,13 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
       digitalWrite(pin, LOW);
       //mqttClient.publish("topic/OnOff", 2, true, "Apagado");
     }
-
-    if (strcmp(topic, "topic/state") == 0) {
-    //mesh.isConnected();
-    Serial.println("Mensage Recibido");
-  }
-  Serial.print("  total: ");
 }
-
+    if (strcmp(topic, "topic/section_1") == 0) {
+       //mesh.isConnected();
+        if (messageTemp == "is_active?") {
+           mqttClient.publish("topic/section_1", 2, true, "Active");
+    }
+  }
 }
 
 void setup() {
